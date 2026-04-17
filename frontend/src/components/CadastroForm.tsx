@@ -1,203 +1,119 @@
-import { useState, useRef } from 'react';
-import { supabase } from '../lib/supabase';
-import type { Veiculo } from '../lib/supabase';
+import React, { useState } from 'react';
+import { supabase } from '../lib/supabase'; // Verifique se o caminho está correto
 
-type Props = {
-  onVeiculoAdicionado: () => void;
-};
-
-const camposVazios = {
-  marca: '',
-  modelo: '',
-  ano: new Date().getFullYear(),
-  preco: 0,
-  km: 0,
-  cor: '',
-  categoria: '' as 'hatch' | 'sedan' | 'pickup' | '',
-  descricao: '',
-  imagem: '',
-};
-
-export default function CadastroForm({ onVeiculoAdicionado }: Props) {
-  const [form, setForm] = useState(camposVazios);
-  const [uploadando, setUploadando] = useState(false);
-  const [salvando, setSalvando] = useState(false);
-  const [erro, setErro] = useState('');
-  const [previewUrl, setPreviewUrl] = useState('');
-  const inputArquivoRef = useRef<HTMLInputElement>(null);
-
-  const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
-    const { name, value } = e.target;
-    setForm(prev => ({ ...prev, [name]: name === 'ano' || name === 'preco' || name === 'km' ? Number(value) : value }));
-  };
-
-  const handleArquivoSelecionado = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const arquivo = e.target.files?.[0];
-    if (!arquivo) return;
-
-    if (!arquivo.type.startsWith('image/')) {
-      setErro('Por favor, selecione um arquivo de imagem válido.');
-      return;
-    }
-
-    setErro('');
-    setPreviewUrl(URL.createObjectURL(arquivo));
-    setUploadando(true);
-
-    const extensao = arquivo.name.split('.').pop();
-    const nomeArquivo = `veiculo_${Date.now()}.${extensao}`;
-
-    const { data, error } = await supabase.storage
-      .from('fotos-veiculos')
-      .upload(nomeArquivo, arquivo, { upsert: true });
-
-    if (error) {
-      setErro('Erro ao fazer upload da imagem: ' + error.message);
-      setUploadando(false);
-      return;
-    }
-
-    const { data: urlData } = supabase.storage
-      .from('fotos-veiculos')
-      .getPublicUrl(data.path);
-
-    setForm(prev => ({ ...prev, imagem: urlData.publicUrl }));
-    setUploadando(false);
-  };
+export default function CadastroForm() {
+  const [modelo, setModelo] = useState('');
+  const [preco, setPreco] = useState('');
+  const [categoria, setCategoria] = useState('Hatch');
+  const [file, setFile] = useState<File | null>(null);
+  const [enviando, setEnviando] = useState(false);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (uploadando) return;
+    if (!file) return alert("Por favor, selecione uma foto!");
+    
+    setEnviando(true);
 
-    setSalvando(true);
-    setErro('');
+    try {
+      // 1. Gerar nome único para a imagem
+      const fileExt = file.name.split('.').pop();
+      const fileName = `${Date.now()}-${Math.random().toString(36).substring(7)}.${fileExt}`;
 
-    const veiculo: Veiculo = { ...form };
+      // 2. Upload para o Supabase Storage
+      const { error: uploadError } = await supabase.storage
+        .from('fotos-veiculos') // Nome do seu bucket
+        .upload(fileName, file);
 
-    const { error } = await supabase.from('veiculos').insert([veiculo]);
+      if (uploadError) throw uploadError;
 
-    if (error) {
-      setErro('Erro ao salvar veículo: ' + error.message);
-    } else {
-      setForm(camposVazios);
-      setPreviewUrl('');
-      if (inputArquivoRef.current) inputArquivoRef.current.value = '';
-      onVeiculoAdicionado();
+      // 3. Pegar a URL pública da imagem
+      const { data: urlData } = supabase.storage
+        .from('fotos-veiculos')
+        .getPublicUrl(fileName);
+
+      const imageUrl = urlData.publicUrl;
+
+      // 4. Salvar no Banco de Dados (Tabela veiculos)
+      const { error: dbError } = await supabase
+        .from('veiculos')
+        .insert([{ 
+          modelo, 
+          preco: parseFloat(preco), 
+          categoria, 
+          imagem: imageUrl 
+        }]);
+
+      if (dbError) throw dbError;
+
+      alert("Wyllkens Wcar: Veículo cadastrado com sucesso!");
+      setModelo('');
+      setPreco('');
+      setFile(null);
+      
+    } catch (error: any) {
+      alert("Erro no processo: " + error.message);
+    } finally {
+      setEnviando(false);
     }
-
-    setSalvando(false);
   };
 
   return (
-    <div className="cadastro-card">
-      <h2 className="form-title">Cadastrar Veículo</h2>
-      <form onSubmit={handleSubmit} className="cadastro-form">
-        <div className="form-row">
-          <div className="form-group">
-            <label>Marca</label>
-            <input name="marca" value={form.marca} onChange={handleChange} placeholder="Ex: Toyota" required />
-          </div>
-          <div className="form-group">
-            <label>Modelo</label>
-            <input name="modelo" value={form.modelo} onChange={handleChange} placeholder="Ex: Corolla" required />
-          </div>
-        </div>
+    <form onSubmit={handleSubmit} className="space-y-4 p-6 bg-gray-900 rounded-lg border border-gray-800">
+      <h2 className="text-xl font-bold text-white mb-4">Cadastrar no Wyllkens Wcar</h2>
+      
+      <div>
+        <label className="block text-sm font-medium text-gray-400">Modelo do Veículo</label>
+        <input 
+          type="text" 
+          value={modelo} 
+          onChange={(e) => setModelo(e.target.value)}
+          className="w-full p-2 bg-gray-800 border border-gray-700 rounded text-white" 
+          required 
+        />
+      </div>
 
-        <div className="form-row">
-          <div className="form-group">
-            <label>Ano</label>
-            <input name="ano" type="number" value={form.ano} onChange={handleChange} min="1990" max="2030" required />
-          </div>
-          <div className="form-group">
-            <label>Preço (R$)</label>
-            <input name="preco" type="number" value={form.preco} onChange={handleChange} min="0" step="0.01" required />
-          </div>
-          <div className="form-group">
-            <label>KM</label>
-            <input name="km" type="number" value={form.km} onChange={handleChange} min="0" required />
-          </div>
-        </div>
+      <div>
+        <label className="block text-sm font-medium text-gray-400">Preço (R$)</label>
+        <input 
+          type="number" 
+          value={preco} 
+          onChange={(e) => setPreco(e.target.value)}
+          className="w-full p-2 bg-gray-800 border border-gray-700 rounded text-white" 
+          required 
+        />
+      </div>
 
-        <div className="form-row">
-          <div className="form-group">
-            <label>Cor</label>
-            <input name="cor" value={form.cor} onChange={handleChange} placeholder="Ex: Prata" required />
-          </div>
-          <div className="form-group">
-            <label>Categoria</label>
-            <select name="categoria" value={form.categoria} onChange={handleChange} required>
-              <option value="">Selecione a categoria</option>
-              <option value="hatch">Hatch</option>
-              <option value="sedan">Sedan</option>
-              <option value="pickup">Pickup</option>
-            </select>
-          </div>
-        </div>
-
-        <div className="form-group">
-          <label>Descrição</label>
-          <textarea name="descricao" value={form.descricao} onChange={handleChange} placeholder="Detalhes do veículo..." rows={3} />
-        </div>
-
-        <div className="form-group">
-          <label>Foto do Veículo</label>
-          <div className="upload-area">
-            <input
-              ref={inputArquivoRef}
-              type="file"
-              accept="image/*"
-              onChange={handleArquivoSelecionado}
-              className="input-arquivo"
-              id="input-foto"
-            />
-            <label htmlFor="input-foto" className={`upload-label ${uploadando ? 'uploading' : ''}`}>
-              {uploadando ? (
-                <span className="upload-status">
-                  <span className="spinner-small" />
-                  Enviando imagem...
-                </span>
-              ) : (
-                <span className="upload-status">
-                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                    <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
-                    <polyline points="17 8 12 3 7 8" />
-                    <line x1="12" y1="3" x2="12" y2="15" />
-                  </svg>
-                  {previewUrl ? 'Trocar imagem' : 'Selecionar imagem'}
-                </span>
-              )}
-            </label>
-            {previewUrl && (
-              <div className="preview-container">
-                <img src={previewUrl} alt="Preview" className="imagem-preview" />
-                {form.imagem && <span className="upload-ok">Imagem salva com sucesso</span>}
-              </div>
-            )}
-          </div>
-        </div>
-
-        {erro && <div className="erro-msg">{erro}</div>}
-
-        <button
-          type="submit"
-          className="btn-salvar"
-          disabled={salvando || uploadando}
+      <div>
+        <label className="block text-sm font-medium text-gray-400">Categoria</label>
+        <select 
+          value={categoria} 
+          onChange={(e) => setCategoria(e.target.value)}
+          className="w-full p-2 bg-gray-800 border border-gray-700 rounded text-white"
         >
-          {salvando ? (
-            <span className="btn-loading">
-              <span className="spinner-small" />
-              Salvando...
-            </span>
-          ) : uploadando ? (
-            <span className="btn-loading">
-              <span className="spinner-small" />
-              Carregando...
-            </span>
-          ) : (
-            'Salvar Veículo'
-          )}
-        </button>
-      </form>
-    </div>
+          <option value="Hatch">Hatch</option>
+          <option value="Sedan">Sedan</option>
+          <option value="Pickup">Pickup</option>
+        </select>
+      </div>
+
+      <div>
+        <label className="block text-sm font-medium text-gray-400">Foto (Direto do Celular)</label>
+        <input 
+          type="file" 
+          accept="image/*" 
+          onChange={(e) => setFile(e.target.files?.[0] || null)}
+          className="w-full p-2 bg-gray-800 border border-gray-700 rounded text-white file:bg-blue-600 file:text-white file:border-0 file:rounded file:px-2 file:mr-2"
+          required
+        />
+      </div>
+
+      <button 
+        type="submit" 
+        disabled={enviando}
+        className="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 rounded transition-all"
+      >
+        {enviando ? 'Enviando Foto e Dados...' : 'Salvar Veículo'}
+      </button>
+    </form>
   );
 }
