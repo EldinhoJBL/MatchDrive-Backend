@@ -9,6 +9,8 @@
     "preview": "npm run preview --prefix frontend"
   },
   "dependencies": {
+    "@google/generative-ai": "^0.24.1",
+    "@supabase/supabase-js": "^2.103.3",
     "react": "^19.2.5"
   }
 }

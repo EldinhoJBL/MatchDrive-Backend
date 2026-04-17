@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { supabase } from '../lib/supabase';
+import { GoogleGenerativeAI } from '@google/generative-ai';
 import type { Veiculo } from '../lib/supabase';
 
 type Props = {
@@ -14,6 +14,11 @@ type PerfilCliente = {
   renda: string;
 };
 
+type MatchResult = {
+  veiculo: Veiculo;
+  explicacao: string;
+};
+
 export default function ClienteMatch({ veiculos }: Props) {
   const [perfil, setPerfil] = useState<PerfilCliente>({
     nome: '',
@@ -22,8 +27,7 @@ export default function ClienteMatch({ veiculos }: Props) {
     tipoPreferido: '',
     renda: '',
   });
-  const [recomendacoes, setRecomendacoes] = useState<Veiculo[]>([]);
-  const [explicacao, setExplicacao] = useState('');
+  const [matches, setMatches] = useState<MatchResult[]>([]);
   const [buscando, setBuscando] = useState(false);
   const [erro, setErro] = useState('');
 
@@ -32,12 +36,11 @@ export default function ClienteMatch({ veiculos }: Props) {
     setPerfil(prev => ({ ...prev, [name]: value }));
   };
 
-  const buscarRecomendacao = async (e: React.FormEvent) => {
+  const buscarMatch = async (e: React.FormEvent) => {
     e.preventDefault();
     setBuscando(true);
     setErro('');
-    setRecomendacoes([]);
-    setExplicacao('');
+    setMatches([]);
 
     if (veiculos.length === 0) {
       setErro('Não há veículos disponíveis no momento.');
@@ -45,9 +48,26 @@ export default function ClienteMatch({ veiculos }: Props) {
       return;
     }
 
+    const apiKey = import.meta.env.VITE_GEMINI_API_KEY;
+    if (!apiKey) {
+      setErro('Chave da API Gemini não configurada.');
+      setBuscando(false);
+      return;
+    }
+
     try {
-      const veiculosTexto = veiculos.map(v => 
-        `ID: ${v.id}, ${v.marca} ${v.modelo} ${v.ano}, Cor: ${v.cor}, KM: ${v.km}, Preço: R$ ${v.preco.toLocaleString('pt-BR')}, Descrição: ${v.descricao || 'N/A'}`
+      const genAI = new GoogleGenerativeAI(apiKey);
+      const model = genAI.getGenerativeModel({ model: 'gemini-2.0-flash' });
+
+      // Filtrar veículos pelo tipo preferido primeiro
+      const veiculosFiltrados = perfil.tipoPreferido
+        ? veiculos.filter(v => v.categoria === perfil.tipoPreferido)
+        : veiculos;
+
+      const veiculosParaAnalise = veiculosFiltrados.length > 0 ? veiculosFiltrados : veiculos;
+
+      const veiculosTexto = veiculosParaAnalise.map(v => 
+        `ID: ${v.id}, ${v.marca} ${v.modelo} ${v.ano}, Categoria: ${v.categoria || 'N/A'}, Cor: ${v.cor}, KM: ${v.km}, Preço: R$ ${v.preco.toLocaleString('pt-BR')}, Descrição: ${v.descricao || 'N/A'}`
       ).join('\n');
 
       const prompt = `Você é um consultor de vendas de carros da loja Wyllkens Wcar em Castanhal, Pará.
@@ -63,56 +83,61 @@ VEÍCULOS DISPONÍVEIS:
 ${veiculosTexto}
 
 INSTRUÇÕES IMPORTANTES:
-1. PRIORIZE o Tipo de Carro preferido pelo cliente (Hatch, Sedan ou Pickup). Se o cliente escolheu um tipo, dê forte preferência a veículos desse tipo.
-2. CONSIDERE o perfil do cliente (idade e profissão) para entender suas necessidades de uso.
-3. A renda é apenas um dado COMPLEMENTAR - não é o fator principal. Use apenas para verificar se o veículo está dentro da realidade financeira do cliente.
-4. Seja amigável e pessoal, usando o nome do cliente.
+1. PRIORIZE FORTEMENTE o Tipo de Carro (Categoria) preferido pelo cliente (Hatch, Sedan ou Pickup). Se o cliente escolheu um tipo, você DEVE dar preferência absoluta a veículos dessa categoria.
+2. CONSIDERE o Perfil do Cliente (idade e profissão) para entender suas necessidades:
+   - Jovens geralmente preferem carros econômicos e modernos
+   - Famílias precisam de espaço
+   - Profissionais liberais valorizam conforto e status
+   - Trabalhadores rurais ou comerciantes podem precisar de pickups
+3. A RENDA é apenas um dado COMPLEMENTAR - não é o fator principal. Use apenas para verificar se o veículo está dentro da realidade financeira.
+4. Seja persuasivo e mencione benefícios específicos para uso em Castanhal/PA (cidade pequena, ruas asfaltadas, proximidade com Belém, etc.).
 
-Responda em formato JSON com a estrutura:
+Para cada veículo recomendado, gere um texto curto e persuasivo (2-3 frases) explicando por que aquele carro "deu match" com o perfil do cliente.
+
+Responda APENAS em formato JSON válido:
 {
-  "veiculosRecomendados": ["id1", "id2"],
-  "explicacao": "Explicação personalizada de 2-3 frases sobre por que esses veículos são ideais para o cliente, mencionando o tipo preferido e o perfil."
+  "matches": [
+    {
+      "id": "id_do_veiculo",
+      "explicacao": "Texto persuasivo explicando o match"
+    }
+  ]
 }
 
-Recomende no máximo 3 veículos, priorizando sempre o tipo de carro preferido e o perfil do cliente.`;
+Recomende no máximo 3 veículos, sempre priorizando a categoria preferida e o perfil.`;
 
-      const response = await fetch(
-        `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${import.meta.env.VITE_GEMINI_API_KEY}`,
-        {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            contents: [{ parts: [{ text: prompt }] }],
-            generationConfig: {
-              temperature: 0.7,
-              maxOutputTokens: 1024,
-            },
-          }),
-        }
-      );
-
-      if (!response.ok) {
-        throw new Error('Erro ao consultar a IA');
-      }
-
-      const data = await response.json();
-      const textoResposta = data.candidates?.[0]?.content?.parts?.[0]?.text || '';
+      const result = await model.generateContent(prompt);
+      const response = await result.response;
+      const textoResposta = response.text();
       
       // Extrair JSON da resposta
       const jsonMatch = textoResposta.match(/\{[\s\S]*\}/);
       if (jsonMatch) {
         const resultado = JSON.parse(jsonMatch[0]);
-        const idsRecomendados = resultado.veiculosRecomendados || [];
-        const veiculosFiltrados = veiculos.filter(v => idsRecomendados.includes(v.id));
+        const matchesData = resultado.matches || [];
         
-        setRecomendacoes(veiculosFiltrados);
-        setExplicacao(resultado.explicacao || 'Veículos selecionados com base no seu perfil.');
+        const matchesFinais: MatchResult[] = [];
+        for (const match of matchesData) {
+          const veiculo = veiculosParaAnalise.find(v => v.id === match.id);
+          if (veiculo) {
+            matchesFinais.push({
+              veiculo,
+              explicacao: match.explicacao,
+            });
+          }
+        }
+        
+        setMatches(matchesFinais);
+        
+        if (matchesFinais.length === 0) {
+          setErro('Não encontramos veículos compatíveis com seu perfil. Tente ajustar suas preferências.');
+        }
       } else {
         throw new Error('Resposta inválida da IA');
       }
     } catch (err) {
       console.error(err);
-      setErro('Não foi possível obter recomendações. Tente novamente.');
+      setErro('Não foi possível obter recomendações. Verifique sua conexão e tente novamente.');
     }
 
     setBuscando(false);
@@ -124,14 +149,23 @@ Recomende no máximo 3 veículos, priorizando sempre o tipo de carro preferido e
   const formatarKm = (km: number) =>
     km.toLocaleString('pt-BR') + ' km';
 
+  const categoriaNome = (cat: string) => {
+    const nomes: Record<string, string> = {
+      hatch: 'Hatch',
+      sedan: 'Sedan',
+      pickup: 'Pickup',
+    };
+    return nomes[cat] || cat;
+  };
+
   return (
     <div className="cliente-match">
       <div className="match-intro">
         <h2>Encontre seu carro ideal</h2>
-        <p>Preencha seus dados e nossa IA vai recomendar os melhores veículos para você!</p>
+        <p>Preencha seus dados e nossa IA vai recomendar os melhores veículos para você em Castanhal!</p>
       </div>
 
-      <form onSubmit={buscarRecomendacao} className="match-form">
+      <form onSubmit={buscarMatch} className="match-form">
         <div className="form-row">
           <div className="form-group">
             <label>Seu Nome</label>
@@ -208,21 +242,20 @@ Recomende no máximo 3 veículos, priorizando sempre o tipo de carro preferido e
                 <path d="m2 17 10 5 10-5" />
                 <path d="m2 12 10 5 10-5" />
               </svg>
-              Encontrar meu carro
+              Encontrar meu Match
             </>
           )}
         </button>
       </form>
 
-      {recomendacoes.length > 0 && (
+      {matches.length > 0 && (
         <div className="recomendacoes">
           <div className="recomendacoes-header">
-            <h3>Veículos recomendados para você</h3>
-            <p className="explicacao-ia">{explicacao}</p>
+            <h3>Carros que deram Match com você!</h3>
           </div>
 
           <div className="recomendacoes-grid">
-            {recomendacoes.map(v => (
+            {matches.map(({ veiculo: v, explicacao }) => (
               <div key={v.id} className="veiculo-card recomendado">
                 <div className="veiculo-imagem-wrap">
                   {v.imagem ? (
@@ -236,20 +269,21 @@ Recomende no máximo 3 veículos, priorizando sempre o tipo de carro preferido e
                       </svg>
                     </div>
                   )}
-                  <span className="badge-recomendado">Recomendado</span>
+                  <span className="badge-recomendado">Match!</span>
                 </div>
                 <div className="veiculo-info">
                   <h3 className="veiculo-nome">{v.marca} {v.modelo}</h3>
                   <div className="veiculo-badges">
                     <span className="badge">{v.ano}</span>
                     <span className="badge">{v.cor}</span>
+                    {v.categoria && <span className="badge badge-categoria">{categoriaNome(v.categoria)}</span>}
                     <span className="badge">{formatarKm(v.km)}</span>
                   </div>
-                  {v.descricao && <p className="veiculo-descricao">{v.descricao}</p>}
+                  <p className="match-explicacao">{explicacao}</p>
                   <div className="veiculo-footer">
                     <span className="veiculo-preco">{formatarPreco(v.preco)}</span>
                     <a
-                      href={`https://wa.me/5591999999999?text=Olá! Vi o ${v.marca} ${v.modelo} no site e tenho interesse!`}
+                      href={`https://wa.me/5591999999999?text=Olá! Vi o ${v.marca} ${v.modelo} no site Wyllkens Wcar e tenho interesse!`}
                       target="_blank"
                       rel="noopener noreferrer"
                       className="btn-contato"

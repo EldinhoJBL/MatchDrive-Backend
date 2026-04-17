@@ -70,6 +70,7 @@ export default function Estoque({ veiculos, carregando, onRemovido }: Props) {
             <div className="veiculo-badges">
               <span className="badge">{v.ano}</span>
               <span className="badge">{v.cor}</span>
+              {v.categoria && <span className="badge badge-categoria">{v.categoria.charAt(0).toUpperCase() + v.categoria.slice(1)}</span>}
               <span className="badge">{formatarKm(v.km)}</span>
             </div>
             {v.descricao && <p className="veiculo-descricao">{v.descricao}</p>}

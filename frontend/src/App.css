@@ -662,6 +662,43 @@
   background: #059669;
 }
 
+/* CATEGORIA BADGE */
+.badge-categoria {
+  background: var(--primary-light);
+  color: var(--primary);
+  border: 1px solid rgba(26, 86, 219, 0.2);
+}
+
+/* MATCH EXPLICACAO */
+.match-explicacao {
+  font-size: 13px;
+  color: var(--text);
+  background: linear-gradient(135deg, var(--primary-light) 0%, #fff 100%);
+  border-left: 3px solid var(--primary);
+  padding: 12px 14px;
+  border-radius: 0 8px 8px 0;
+  margin: 10px 0;
+  line-height: 1.5;
+  font-style: italic;
+}
+
+/* FORM SELECT */
+.form-group select {
+  padding: 9px 12px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: #fff;
+  color: var(--text-h);
+  transition: border-color 0.15s, box-shadow 0.15s;
+  outline: none;
+  font-size: 14px;
+}
+
+.form-group select:focus {
+  border-color: var(--primary);
+  box-shadow: 0 0 0 3px rgba(26, 86, 219, 0.12);
+}
+
 /* RESPONSIVE */
 @media (max-width: 640px) {
   .header-inner {

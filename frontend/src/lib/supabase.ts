@@ -13,6 +13,7 @@ export type Veiculo = {
   preco: number;
   km: number;
   cor: string;
+  categoria: 'hatch' | 'sedan' | 'pickup';
   descricao: string;
   imagem: string;
   created_at?: string;
