@@ -13,6 +13,7 @@ const camposVazios = {
   preco: 0,
   km: 0,
   cor: '',
+  categoria: '' as 'hatch' | 'sedan' | 'pickup' | '',
   descricao: '',
   imagem: '',
 };
@@ -25,7 +26,7 @@ export default function CadastroForm({ onVeiculoAdicionado }: Props) {
   const [previewUrl, setPreviewUrl] = useState('');
   const inputArquivoRef = useRef<HTMLInputElement>(null);
 
-  const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
+  const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
     const { name, value } = e.target;
     setForm(prev => ({ ...prev, [name]: name === 'ano' || name === 'preco' || name === 'km' ? Number(value) : value }));
   };
@@ -121,6 +122,15 @@ export default function CadastroForm({ onVeiculoAdicionado }: Props) {
           <div className="form-group">
             <label>Cor</label>
             <input name="cor" value={form.cor} onChange={handleChange} placeholder="Ex: Prata" required />
+          </div>
+          <div className="form-group">
+            <label>Categoria</label>
+            <select name="categoria" value={form.categoria} onChange={handleChange} required>
+              <option value="">Selecione a categoria</option>
+              <option value="hatch">Hatch</option>
+              <option value="sedan">Sedan</option>
+              <option value="pickup">Pickup</option>
+            </select>
           </div>
         </div>
 

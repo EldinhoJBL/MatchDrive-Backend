@@ -443,10 +443,277 @@
   gap: 8px;
 }
 
+/* LOGIN */
+.login-container {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 40px 20px;
+}
+
+.login-card {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  padding: 40px;
+  width: 100%;
+  max-width: 400px;
+  box-shadow: var(--shadow-md);
+}
+
+.login-header {
+  text-align: center;
+  margin-bottom: 32px;
+}
+
+.login-header svg {
+  color: var(--primary);
+  margin-bottom: 16px;
+}
+
+.login-header h1 {
+  font-size: 24px;
+  font-weight: 700;
+  color: var(--text-h);
+  margin-bottom: 8px;
+}
+
+.login-header p {
+  color: var(--text-light);
+  font-size: 14px;
+}
+
+.login-form {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.btn-login {
+  margin-top: 8px;
+  padding: 12px 24px;
+  background: var(--primary);
+  color: #fff;
+  border: none;
+  border-radius: 8px;
+  font-size: 15px;
+  font-weight: 600;
+  transition: background 0.15s, opacity 0.15s;
+  width: 100%;
+}
+
+.btn-login:hover:not(:disabled) {
+  background: var(--primary-dark);
+}
+
+.btn-login:disabled {
+  opacity: 0.65;
+  cursor: not-allowed;
+}
+
+.nav-btn.logout {
+  color: var(--error);
+}
+
+.nav-btn.logout:hover {
+  background: var(--error-bg);
+  color: var(--error);
+}
+
+/* CLIENTE MATCH */
+.cliente-match {
+  max-width: 800px;
+}
+
+.match-intro {
+  margin-bottom: 28px;
+}
+
+.match-intro h2 {
+  font-size: 22px;
+  font-weight: 700;
+  color: var(--text-h);
+  margin-bottom: 8px;
+}
+
+.match-intro p {
+  color: var(--text-light);
+  font-size: 14px;
+}
+
+.match-form {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  padding: 28px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  box-shadow: var(--shadow-sm);
+}
+
+.match-form select {
+  padding: 9px 12px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: #fff;
+  color: var(--text-h);
+  transition: border-color 0.15s, box-shadow 0.15s;
+  outline: none;
+  font-size: 14px;
+}
+
+.match-form select:focus {
+  border-color: var(--primary);
+  box-shadow: 0 0 0 3px rgba(26, 86, 219, 0.12);
+}
+
+.btn-match {
+  margin-top: 8px;
+  padding: 12px 24px;
+  background: var(--primary);
+  color: #fff;
+  border: none;
+  border-radius: 8px;
+  font-size: 15px;
+  font-weight: 600;
+  transition: background 0.15s, opacity 0.15s;
+  align-self: flex-start;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.btn-match:hover:not(:disabled) {
+  background: var(--primary-dark);
+}
+
+.btn-match:disabled {
+  opacity: 0.65;
+  cursor: not-allowed;
+}
+
+/* RECOMENDACOES */
+.recomendacoes {
+  margin-top: 40px;
+}
+
+.recomendacoes-header {
+  margin-bottom: 20px;
+}
+
+.recomendacoes-header h3 {
+  font-size: 20px;
+  font-weight: 700;
+  color: var(--text-h);
+  margin-bottom: 12px;
+}
+
+.explicacao-ia {
+  background: var(--primary-light);
+  border: 1px solid rgba(26, 86, 219, 0.2);
+  border-radius: 10px;
+  padding: 14px 18px;
+  color: var(--primary-dark);
+  font-size: 14px;
+  line-height: 1.6;
+}
+
+.recomendacoes-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: 20px;
+}
+
+.veiculo-card.recomendado {
+  border-color: var(--primary);
+  box-shadow: 0 0 0 1px var(--primary), var(--shadow-md);
+}
+
+.badge-recomendado {
+  position: absolute;
+  top: 12px;
+  right: 12px;
+  background: var(--primary);
+  color: #fff;
+  font-size: 11px;
+  font-weight: 600;
+  padding: 4px 10px;
+  border-radius: 20px;
+}
+
+.veiculo-imagem-wrap {
+  position: relative;
+}
+
+.btn-contato {
+  padding: 6px 14px;
+  background: var(--success);
+  color: #fff;
+  border: none;
+  border-radius: 7px;
+  font-size: 13px;
+  font-weight: 500;
+  text-decoration: none;
+  transition: background 0.15s;
+}
+
+.btn-contato:hover {
+  background: #059669;
+}
+
+/* CATEGORIA BADGE */
+.badge-categoria {
+  background: var(--primary-light);
+  color: var(--primary);
+  border: 1px solid rgba(26, 86, 219, 0.2);
+}
+
+/* MATCH EXPLICACAO */
+.match-explicacao {
+  font-size: 13px;
+  color: var(--text);
+  background: linear-gradient(135deg, var(--primary-light) 0%, #fff 100%);
+  border-left: 3px solid var(--primary);
+  padding: 12px 14px;
+  border-radius: 0 8px 8px 0;
+  margin: 10px 0;
+  line-height: 1.5;
+  font-style: italic;
+}
+
+/* FORM SELECT */
+.form-group select {
+  padding: 9px 12px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: #fff;
+  color: var(--text-h);
+  transition: border-color 0.15s, box-shadow 0.15s;
+  outline: none;
+  font-size: 14px;
+}
+
+.form-group select:focus {
+  border-color: var(--primary);
+  box-shadow: 0 0 0 3px rgba(26, 86, 219, 0.12);
+}
+
 /* RESPONSIVE */
 @media (max-width: 640px) {
   .header-inner {
     padding: 0 16px;
+    flex-wrap: wrap;
+    height: auto;
+    padding-top: 12px;
+    padding-bottom: 12px;
+    gap: 12px;
+  }
+
+  .nav {
+    width: 100%;
+    justify-content: center;
+    flex-wrap: wrap;
   }
 
   .main {
@@ -463,5 +730,17 @@
 
   .estoque-grid {
     grid-template-columns: 1fr;
+  }
+
+  .match-form {
+    padding: 20px 16px;
+  }
+
+  .recomendacoes-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .login-card {
+    padding: 28px 20px;
   }
 }
