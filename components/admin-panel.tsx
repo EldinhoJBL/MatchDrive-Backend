@@ -253,30 +253,11 @@ export default function AdminPanel() {
           <CardContent className="space-y-4">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div className="space-y-2">
-                <label className="text-sm font-medium text-foreground">Marca *</label>
-                <Input
-                  placeholder="Ex: Toyota"
-                  value={formData.marca}
-                  onChange={(e) => setFormData({ ...formData, marca: e.target.value })}
-                  className="bg-secondary border-border focus:border-red-500"
-                />
-              </div>
-              <div className="space-y-2">
                 <label className="text-sm font-medium text-foreground">Modelo *</label>
                 <Input
-                  placeholder="Ex: Corolla"
+                  placeholder="Ex: Toyota Corolla 2024"
                   value={formData.modelo}
                   onChange={(e) => setFormData({ ...formData, modelo: e.target.value })}
-                  className="bg-secondary border-border focus:border-red-500"
-                />
-              </div>
-              <div className="space-y-2">
-                <label className="text-sm font-medium text-foreground">Ano *</label>
-                <Input
-                  type="number"
-                  placeholder="Ex: 2024"
-                  value={formData.ano}
-                  onChange={(e) => setFormData({ ...formData, ano: parseInt(e.target.value) || 0 })}
                   className="bg-secondary border-border focus:border-red-500"
                 />
               </div>
