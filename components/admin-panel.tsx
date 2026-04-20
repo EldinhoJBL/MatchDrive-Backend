@@ -1,11 +1,11 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { supabase, type Veiculo, type CategoriaVeiculo } from '@/lib/supabase'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
-import { Plus, Pencil, Trash2, Car, Loader2, Save, X, ImageIcon } from 'lucide-react'
+import { Plus, Pencil, Trash2, Car, Loader2, Save, X, ImageIcon, Upload } from 'lucide-react'
 
 const CATEGORIAS: { value: CategoriaVeiculo; label: string; icon: string }[] = [
   { value: 'hatch', label: 'Hatch', icon: '🚗' },
@@ -17,8 +17,12 @@ export default function AdminPanel() {
   const [veiculos, setVeiculos] = useState<Veiculo[]>([])
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
+  const [uploadingImage, setUploadingImage] = useState(false)
   const [editingId, setEditingId] = useState<number | null>(null)
   const [showForm, setShowForm] = useState(false)
+  const [selectedFile, setSelectedFile] = useState<File | null>(null)
+  const [previewUrl, setPreviewUrl] = useState<string>('')
+  const fileInputRef = useRef<HTMLInputElement>(null)
   const [formData, setFormData] = useState<Omit<Veiculo, 'id' | 'created_at'>>({
     marca: '',
     modelo: '',
@@ -48,25 +52,49 @@ export default function AdminPanel() {
   }
 
   const salvarVeiculo = async () => {
-    if (!formData.marca || !formData.modelo || !formData.ano || !formData.preco || !formData.categoria) {
-      alert('Por favor, preencha todos os campos obrigatorios, incluindo a categoria.')
+    if (!formData.modelo || !formData.preco || !formData.categoria) {
+      alert('Por favor, preencha todos os campos obrigatorios: Modelo, Preco e Categoria.')
       return
     }
 
     setSaving(true)
 
     try {
+      let imagemUrl = formData.imagem_url
+
+      // Se ha um arquivo selecionado, fazer upload primeiro
+      if (selectedFile) {
+        const uploadedUrl = await uploadImageToSupabase(selectedFile)
+        if (uploadedUrl) {
+          imagemUrl = uploadedUrl
+        } else {
+          // Se o upload falhar, perguntar se quer continuar sem imagem
+          const continuar = confirm('Nao foi possivel fazer upload da imagem. Deseja cadastrar o veiculo sem imagem?')
+          if (!continuar) {
+            setSaving(false)
+            return
+          }
+        }
+      }
+
+      const dadosParaSalvar = {
+        modelo: formData.modelo,
+        preco: formData.preco,
+        categoria: formData.categoria,
+        imagem: imagemUrl,
+      }
+
       if (editingId) {
         const { error } = await supabase
           .from('veiculos')
-          .update(formData)
+          .update(dadosParaSalvar)
           .eq('id', editingId)
 
         if (error) throw error
       } else {
         const { error } = await supabase
           .from('veiculos')
-          .insert([formData])
+          .insert([dadosParaSalvar])
 
         if (error) throw error
       }
@@ -99,13 +127,14 @@ export default function AdminPanel() {
 
   const editarVeiculo = (veiculo: Veiculo) => {
     setFormData({
-      marca: veiculo.marca,
+      marca: veiculo.marca || '',
       modelo: veiculo.modelo,
-      ano: veiculo.ano,
+      ano: veiculo.ano || new Date().getFullYear(),
       preco: veiculo.preco,
-      imagem_url: veiculo.imagem_url,
+      imagem_url: veiculo.imagem || veiculo.imagem_url || '',
       categoria: veiculo.categoria || 'hatch',
     })
+    setPreviewUrl(veiculo.imagem || veiculo.imagem_url || '')
     setEditingId(veiculo.id || null)
     setShowForm(true)
   }
@@ -121,6 +150,11 @@ export default function AdminPanel() {
     })
     setEditingId(null)
     setShowForm(false)
+    setSelectedFile(null)
+    setPreviewUrl('')
+    if (fileInputRef.current) {
+      fileInputRef.current.value = ''
+    }
   }
 
   const formatarPreco = (valor: string) => {
@@ -130,6 +164,59 @@ export default function AdminPanel() {
 
   const getCategoriaLabel = (categoria: CategoriaVeiculo) => {
     return CATEGORIAS.find(c => c.value === categoria)?.label || categoria
+  }
+
+  const handleFileSelect = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0]
+    if (file) {
+      setSelectedFile(file)
+      // Criar preview local
+      const objectUrl = URL.createObjectURL(file)
+      setPreviewUrl(objectUrl)
+    }
+  }
+
+  const uploadImageToSupabase = async (file: File): Promise<string | null> => {
+    try {
+      setUploadingImage(true)
+      
+      // Gerar nome unico para o arquivo
+      const fileExt = file.name.split('.').pop()
+      const fileName = `${Date.now()}-${Math.random().toString(36).substring(2)}.${fileExt}`
+      const filePath = `veiculos/${fileName}`
+
+      // Upload para o Supabase Storage
+      const { error: uploadError } = await supabase.storage
+        .from('fotos-veiculos')
+        .upload(filePath, file, {
+          cacheControl: '3600',
+          upsert: false
+        })
+
+      if (uploadError) {
+        console.error('Erro no upload:', uploadError)
+        // Se o bucket nao existir, mostrar mensagem mais clara
+        if (uploadError.message.includes('Bucket not found') || uploadError.message.includes('bucket')) {
+          alert('Bucket "fotos-veiculos" nao encontrado no Supabase Storage. Por favor, crie o bucket primeiro no painel do Supabase.')
+        } else {
+          alert(`Erro ao fazer upload da imagem: ${uploadError.message}`)
+        }
+        return null
+      }
+
+      // Obter URL publica
+      const { data: publicUrlData } = supabase.storage
+        .from('fotos-veiculos')
+        .getPublicUrl(filePath)
+
+      return publicUrlData.publicUrl
+    } catch (err) {
+      console.error('Erro no upload:', err)
+      alert('Erro ao fazer upload da imagem. Tente novamente.')
+      return null
+    } finally {
+      setUploadingImage(false)
+    }
   }
 
   return (
@@ -230,31 +317,59 @@ export default function AdminPanel() {
               </div>
             </div>
 
-            <div className="space-y-2">
+            {/* Upload de Foto */}
+            <div className="space-y-3">
               <label className="text-sm font-medium text-foreground flex items-center gap-2">
                 <ImageIcon className="h-4 w-4 text-muted-foreground" />
-                URL da Imagem
+                Foto do Veiculo
               </label>
-              <Input
-                type="url"
-                placeholder="https://exemplo.com/imagem.jpg"
-                value={formData.imagem_url}
-                onChange={(e) => setFormData({ ...formData, imagem_url: e.target.value })}
-                className="bg-secondary border-border focus:border-red-500"
+              
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept="image/*"
+                onChange={handleFileSelect}
+                className="hidden"
+                id="foto-veiculo"
               />
-            </div>
-            {formData.imagem_url && (
-              <div className="aspect-video max-w-md rounded-lg overflow-hidden bg-secondary">
-                <img
-                  src={formData.imagem_url}
-                  alt="Preview"
-                  className="w-full h-full object-cover"
-                  onError={(e) => {
-                    (e.target as HTMLImageElement).style.display = 'none'
-                  }}
-                />
+              
+              <div 
+                onClick={() => fileInputRef.current?.click()}
+                className="border-2 border-dashed border-border rounded-lg p-6 text-center cursor-pointer hover:border-red-500/50 transition-colors bg-secondary"
+              >
+                {previewUrl || formData.imagem_url ? (
+                  <div className="space-y-3">
+                    <div className="aspect-video max-w-md mx-auto rounded-lg overflow-hidden bg-muted">
+                      <img
+                        src={previewUrl || formData.imagem_url}
+                        alt="Preview"
+                        className="w-full h-full object-cover"
+                      />
+                    </div>
+                    <p className="text-sm text-muted-foreground">
+                      {selectedFile ? selectedFile.name : 'Clique para trocar a imagem'}
+                    </p>
+                  </div>
+                ) : (
+                  <div className="space-y-2">
+                    <Upload className="h-10 w-10 mx-auto text-muted-foreground" />
+                    <p className="text-sm font-medium text-foreground">
+                      Clique para selecionar uma foto
+                    </p>
+                    <p className="text-xs text-muted-foreground">
+                      Aceita JPG, PNG ou WEBP
+                    </p>
+                  </div>
+                )}
               </div>
-            )}
+              
+              {uploadingImage && (
+                <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                  Fazendo upload da imagem...
+                </div>
+              )}
+            </div>
             <div className="flex gap-2">
               <Button
                 onClick={salvarVeiculo}
@@ -305,10 +420,10 @@ export default function AdminPanel() {
               {veiculos.map((veiculo) => (
                 <Card key={veiculo.id} className="bg-secondary border-border overflow-hidden">
                   <div className="aspect-video relative bg-muted">
-                    {veiculo.imagem_url ? (
+                    {(veiculo.imagem || veiculo.imagem_url) ? (
                       <img
-                        src={veiculo.imagem_url}
-                        alt={`${veiculo.marca} ${veiculo.modelo}`}
+                        src={veiculo.imagem || veiculo.imagem_url}
+                        alt={veiculo.modelo}
                         className="w-full h-full object-cover"
                       />
                     ) : (
@@ -325,9 +440,8 @@ export default function AdminPanel() {
                   </div>
                   <CardContent className="p-4">
                     <h3 className="font-semibold text-foreground">
-                      {veiculo.marca} {veiculo.modelo}
+                      {veiculo.modelo}
                     </h3>
-                    <p className="text-sm text-muted-foreground">Ano: {veiculo.ano}</p>
                     <p className="text-lg font-bold text-red-500 mt-2">
                       {new Intl.NumberFormat('pt-BR', {
                         style: 'currency',

@@ -375,10 +375,10 @@ export function ConsultoriaDashboard() {
             
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
               <div className="aspect-video relative rounded-lg overflow-hidden bg-secondary">
-                {veiculoRecomendado.imagem_url ? (
+                {(veiculoRecomendado.imagem || veiculoRecomendado.imagem_url) ? (
                   <img
-                    src={veiculoRecomendado.imagem_url}
-                    alt={`${veiculoRecomendado.marca} ${veiculoRecomendado.modelo}`}
+                    src={veiculoRecomendado.imagem || veiculoRecomendado.imagem_url}
+                    alt={veiculoRecomendado.modelo}
                     className="w-full h-full object-cover"
                   />
                 ) : (
@@ -400,9 +400,8 @@ export function ConsultoriaDashboard() {
                     )}
                   </div>
                   <h3 className="text-2xl font-bold text-foreground">
-                    {veiculoRecomendado.marca} {veiculoRecomendado.modelo}
+                    {veiculoRecomendado.modelo}
                   </h3>
-                  <p className="text-muted-foreground">Ano: {veiculoRecomendado.ano}</p>
                 </div>
                 <div className="bg-gradient-to-r from-red-600/10 to-red-800/10 rounded-lg p-4">
                   <p className="text-sm text-muted-foreground">Investimento</p>
