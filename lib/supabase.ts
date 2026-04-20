@@ -9,13 +9,12 @@ export type CategoriaVeiculo = 'hatch' | 'sedan' | 'pickup'
 
 export interface Veiculo {
   id?: number
+  marca: string
   modelo: string
+  ano: number
   preco: number
   categoria: CategoriaVeiculo
   imagem?: string
-  // Campos legados (para compatibilidade)
-  marca?: string
-  ano?: number
   imagem_url?: string
   created_at?: string
 }

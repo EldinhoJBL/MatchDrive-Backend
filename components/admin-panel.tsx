@@ -52,8 +52,8 @@ export default function AdminPanel() {
   }
 
   const salvarVeiculo = async () => {
-    if (!formData.modelo || !formData.preco || !formData.categoria) {
-      alert('Por favor, preencha todos os campos obrigatorios: Modelo, Preco e Categoria.')
+    if (!formData.marca || !formData.modelo || !formData.ano || !formData.preco || !formData.categoria) {
+      alert('Por favor, preencha todos os campos obrigatorios: Marca, Modelo, Ano, Preco e Categoria.')
       return
     }
 
@@ -78,7 +78,9 @@ export default function AdminPanel() {
       }
 
       const dadosParaSalvar = {
+        marca: formData.marca,
         modelo: formData.modelo,
+        ano: formData.ano,
         preco: formData.preco,
         categoria: formData.categoria,
         imagem: imagemUrl,
@@ -253,11 +255,30 @@ export default function AdminPanel() {
           <CardContent className="space-y-4">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div className="space-y-2">
+                <label className="text-sm font-medium text-foreground">Marca *</label>
+                <Input
+                  placeholder="Ex: Toyota"
+                  value={formData.marca}
+                  onChange={(e) => setFormData({ ...formData, marca: e.target.value })}
+                  className="bg-secondary border-border focus:border-red-500"
+                />
+              </div>
+              <div className="space-y-2">
                 <label className="text-sm font-medium text-foreground">Modelo *</label>
                 <Input
-                  placeholder="Ex: Toyota Corolla 2024"
+                  placeholder="Ex: Corolla"
                   value={formData.modelo}
                   onChange={(e) => setFormData({ ...formData, modelo: e.target.value })}
+                  className="bg-secondary border-border focus:border-red-500"
+                />
+              </div>
+              <div className="space-y-2">
+                <label className="text-sm font-medium text-foreground">Ano *</label>
+                <Input
+                  type="number"
+                  placeholder="Ex: 2024"
+                  value={formData.ano}
+                  onChange={(e) => setFormData({ ...formData, ano: parseInt(e.target.value) || 0 })}
                   className="bg-secondary border-border focus:border-red-500"
                 />
               </div>
@@ -421,8 +442,9 @@ export default function AdminPanel() {
                   </div>
                   <CardContent className="p-4">
                     <h3 className="font-semibold text-foreground">
-                      {veiculo.modelo}
+                      {veiculo.marca} {veiculo.modelo}
                     </h3>
+                    <p className="text-sm text-muted-foreground">Ano: {veiculo.ano}</p>
                     <p className="text-lg font-bold text-red-500 mt-2">
                       {new Intl.NumberFormat('pt-BR', {
                         style: 'currency',

@@ -400,8 +400,9 @@ export function ConsultoriaDashboard() {
                     )}
                   </div>
                   <h3 className="text-2xl font-bold text-foreground">
-                    {veiculoRecomendado.modelo}
+                    {veiculoRecomendado.marca} {veiculoRecomendado.modelo}
                   </h3>
+                  <p className="text-muted-foreground">Ano: {veiculoRecomendado.ano}</p>
                 </div>
                 <div className="bg-gradient-to-r from-red-600/10 to-red-800/10 rounded-lg p-4">
                   <p className="text-sm text-muted-foreground">Investimento</p>
