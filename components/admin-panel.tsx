@@ -20,8 +20,8 @@ export default function AdminPanel() {
   const [uploadingImage, setUploadingImage] = useState(false)
   const [editingId, setEditingId] = useState<number | null>(null)
   const [showForm, setShowForm] = useState(false)
-  const [selectedFile, setSelectedFile] = useState<File | null>(null)
-  const [previewUrl, setPreviewUrl] = useState<string>('')
+  const [selectedFiles, setSelectedFiles] = useState<File[]>([])
+  const [previewUrls, setPreviewUrls] = useState<string[]>([])
   const fileInputRef = useRef<HTMLInputElement>(null)
   const [formData, setFormData] = useState<Omit<Veiculo, 'id' | 'created_at'>>({
     marca: '',
@@ -60,16 +60,24 @@ export default function AdminPanel() {
     setSaving(true)
 
     try {
-      let imagemUrl = formData.imagem_url
+      let imagemPrincipal = formData.imagem_url || null
+      let imagensAdicionais: string[] = []
 
-      // Se ha um arquivo selecionado, fazer upload primeiro
-      if (selectedFile) {
-        const uploadedUrl = await uploadImageToSupabase(selectedFile)
-        if (uploadedUrl) {
-          imagemUrl = uploadedUrl
+      // Se ha arquivos selecionados, fazer upload
+      if (selectedFiles.length > 0) {
+        const uploadedUrls: string[] = []
+        for (const file of selectedFiles) {
+          const uploadedUrl = await uploadImageToSupabase(file)
+          if (uploadedUrl) {
+            uploadedUrls.push(uploadedUrl)
+          }
+        }
+        
+        if (uploadedUrls.length > 0) {
+          imagemPrincipal = uploadedUrls[0]
+          imagensAdicionais = uploadedUrls
         } else {
-          // Se o upload falhar, perguntar se quer continuar sem imagem
-          const continuar = confirm('Nao foi possivel fazer upload da imagem. Deseja cadastrar o veiculo sem imagem?')
+          const continuar = confirm('Nao foi possivel fazer upload das imagens. Deseja cadastrar o veiculo sem imagens?')
           if (!continuar) {
             setSaving(false)
             return
@@ -83,34 +91,29 @@ export default function AdminPanel() {
         ano: formData.ano,
         preco: formData.preco,
         categoria: formData.categoria,
-        imagem: imagemUrl || null,
+        imagem: imagemPrincipal,
+        imagens: imagensAdicionais.length > 0 ? imagensAdicionais : null,
       }
 
-      console.log("[v0] Dados para salvar:", dadosParaSalvar)
-
       if (editingId) {
-        const { data, error } = await supabase
+        const { error } = await supabase
           .from('veiculos')
           .update(dadosParaSalvar)
           .eq('id', editingId)
-          .select()
 
-        console.log("[v0] Update response - data:", data, "error:", error)
         if (error) throw error
       } else {
-        const { data, error } = await supabase
+        const { error } = await supabase
           .from('veiculos')
           .insert([dadosParaSalvar])
-          .select()
 
-        console.log("[v0] Insert response - data:", data, "error:", error)
         if (error) throw error
       }
 
       await carregarVeiculos()
       resetForm()
     } catch (err: any) {
-      console.error('[v0] Erro ao salvar:', err)
+      console.error('Erro ao salvar:', err)
       const errorMessage = err?.message || err?.details || JSON.stringify(err)
       alert(`Erro ao salvar veiculo: ${errorMessage}`)
     } finally {
@@ -143,7 +146,9 @@ export default function AdminPanel() {
       imagem_url: veiculo.imagem || veiculo.imagem_url || '',
       categoria: veiculo.categoria || 'hatch',
     })
-    setPreviewUrl(veiculo.imagem || veiculo.imagem_url || '')
+    // Carregar imagens existentes para preview
+    const imagensExistentes = veiculo.imagens || (veiculo.imagem ? [veiculo.imagem] : [])
+    setPreviewUrls(imagensExistentes)
     setEditingId(veiculo.id || null)
     setShowForm(true)
   }
@@ -159,8 +164,8 @@ export default function AdminPanel() {
     })
     setEditingId(null)
     setShowForm(false)
-    setSelectedFile(null)
-    setPreviewUrl('')
+    setSelectedFiles([])
+    setPreviewUrls([])
     if (fileInputRef.current) {
       fileInputRef.current.value = ''
     }
@@ -176,13 +181,19 @@ export default function AdminPanel() {
   }
 
   const handleFileSelect = (event: React.ChangeEvent<HTMLInputElement>) => {
-    const file = event.target.files?.[0]
-    if (file) {
-      setSelectedFile(file)
-      // Criar preview local
-      const objectUrl = URL.createObjectURL(file)
-      setPreviewUrl(objectUrl)
+    const files = event.target.files
+    if (files && files.length > 0) {
+      const newFiles = Array.from(files)
+      setSelectedFiles(prev => [...prev, ...newFiles])
+      // Criar previews locais
+      const newUrls = newFiles.map(file => URL.createObjectURL(file))
+      setPreviewUrls(prev => [...prev, ...newUrls])
     }
+  }
+
+  const removerImagem = (index: number) => {
+    setSelectedFiles(prev => prev.filter((_, i) => i !== index))
+    setPreviewUrls(prev => prev.filter((_, i) => i !== index))
   }
 
   const uploadImageToSupabase = async (file: File): Promise<string | null> => {
@@ -326,56 +337,72 @@ export default function AdminPanel() {
               </div>
             </div>
 
-            {/* Upload de Foto */}
+            {/* Upload de Fotos - Multiplas */}
             <div className="space-y-3">
               <label className="text-sm font-medium text-foreground flex items-center gap-2">
                 <ImageIcon className="h-4 w-4 text-muted-foreground" />
-                Foto do Veiculo
+                Fotos do Veiculo (pode adicionar varias)
               </label>
               
               <input
                 ref={fileInputRef}
                 type="file"
                 accept="image/*"
+                multiple
                 onChange={handleFileSelect}
                 className="hidden"
                 id="foto-veiculo"
               />
               
+              {/* Grid de Imagens */}
+              {previewUrls.length > 0 && (
+                <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
+                  {previewUrls.map((url, index) => (
+                    <div key={index} className="relative group">
+                      <div className="aspect-video rounded-lg overflow-hidden bg-muted">
+                        <img
+                          src={url}
+                          alt={`Preview ${index + 1}`}
+                          className="w-full h-full object-cover"
+                        />
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => removerImagem(index)}
+                        className="absolute top-1 right-1 bg-red-600 text-white rounded-full p-1 opacity-0 group-hover:opacity-100 transition-opacity"
+                      >
+                        <X className="h-4 w-4" />
+                      </button>
+                      {index === 0 && (
+                        <span className="absolute bottom-1 left-1 bg-red-600 text-white text-xs px-2 py-0.5 rounded">
+                          Principal
+                        </span>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              )}
+              
+              {/* Botao para adicionar mais fotos */}
               <div 
                 onClick={() => fileInputRef.current?.click()}
                 className="border-2 border-dashed border-border rounded-lg p-6 text-center cursor-pointer hover:border-red-500/50 transition-colors bg-secondary"
               >
-                {previewUrl || formData.imagem_url ? (
-                  <div className="space-y-3">
-                    <div className="aspect-video max-w-md mx-auto rounded-lg overflow-hidden bg-muted">
-                      <img
-                        src={previewUrl || formData.imagem_url}
-                        alt="Preview"
-                        className="w-full h-full object-cover"
-                      />
-                    </div>
-                    <p className="text-sm text-muted-foreground">
-                      {selectedFile ? selectedFile.name : 'Clique para trocar a imagem'}
-                    </p>
-                  </div>
-                ) : (
-                  <div className="space-y-2">
-                    <Upload className="h-10 w-10 mx-auto text-muted-foreground" />
-                    <p className="text-sm font-medium text-foreground">
-                      Clique para selecionar uma foto
-                    </p>
-                    <p className="text-xs text-muted-foreground">
-                      Aceita JPG, PNG ou WEBP
-                    </p>
-                  </div>
-                )}
+                <div className="space-y-2">
+                  <Upload className="h-10 w-10 mx-auto text-muted-foreground" />
+                  <p className="text-sm font-medium text-foreground">
+                    {previewUrls.length > 0 ? 'Adicionar mais fotos' : 'Clique para selecionar fotos'}
+                  </p>
+                  <p className="text-xs text-muted-foreground">
+                    Aceita JPG, PNG ou WEBP - Selecione uma ou mais imagens
+                  </p>
+                </div>
               </div>
               
               {uploadingImage && (
                 <div className="flex items-center gap-2 text-sm text-muted-foreground">
                   <Loader2 className="h-4 w-4 animate-spin" />
-                  Fazendo upload da imagem...
+                  Fazendo upload das imagens...
                 </div>
               )}
             </div>

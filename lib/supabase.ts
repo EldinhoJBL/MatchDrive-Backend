@@ -15,6 +15,7 @@ export interface Veiculo {
   preco: number
   categoria: CategoriaVeiculo
   imagem?: string
+  imagens?: string[]
   imagem_url?: string
   created_at?: string
 }
