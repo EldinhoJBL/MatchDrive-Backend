@@ -109,9 +109,10 @@ export default function AdminPanel() {
 
       await carregarVeiculos()
       resetForm()
-    } catch (err) {
-      console.error('Erro ao salvar:', err)
-      alert('Erro ao salvar veiculo. Tente novamente.')
+    } catch (err: any) {
+      console.error('[v0] Erro ao salvar:', err)
+      const errorMessage = err?.message || err?.details || JSON.stringify(err)
+      alert(`Erro ao salvar veiculo: ${errorMessage}`)
     } finally {
       setSaving(false)
     }
