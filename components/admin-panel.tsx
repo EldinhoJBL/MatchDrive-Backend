@@ -83,21 +83,27 @@ export default function AdminPanel() {
         ano: formData.ano,
         preco: formData.preco,
         categoria: formData.categoria,
-        imagem: imagemUrl,
+        imagem: imagemUrl || null,
       }
 
+      console.log("[v0] Dados para salvar:", dadosParaSalvar)
+
       if (editingId) {
-        const { error } = await supabase
+        const { data, error } = await supabase
           .from('veiculos')
           .update(dadosParaSalvar)
           .eq('id', editingId)
+          .select()
 
+        console.log("[v0] Update response - data:", data, "error:", error)
         if (error) throw error
       } else {
-        const { error } = await supabase
+        const { data, error } = await supabase
           .from('veiculos')
           .insert([dadosParaSalvar])
+          .select()
 
+        console.log("[v0] Insert response - data:", data, "error:", error)
         if (error) throw error
       }
 
