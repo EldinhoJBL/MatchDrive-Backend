@@ -116,7 +116,7 @@ export function ConsultoriaDashboard() {
   const [profissao, setProfissao] = useState('')
   const [categoriaPreferida, setCategoriaPreferida] = useState<CategoriaVeiculo | ''>('')
   const [loading, setLoading] = useState(false)
-  const [veiculoRecomendado, setVeiculoRecomendado] = useState<Veiculo | null>(null)
+  const [veiculosRecomendados, setVeiculosRecomendados] = useState<Veiculo[]>([])
   const [argumentoVenda, setArgumentoVenda] = useState('')
   const [loadingArgumento, setLoadingArgumento] = useState(false)
   const [perfilIdentificado, setPerfilIdentificado] = useState<{ prioridade: string; descricao: string } | null>(null)
@@ -128,7 +128,7 @@ export function ConsultoriaDashboard() {
     }
 
     setLoading(true)
-    setVeiculoRecomendado(null)
+    setVeiculosRecomendados([])
     setArgumentoVenda('')
     setPerfilIdentificado(null)
 
@@ -151,59 +151,39 @@ export function ConsultoriaDashboard() {
         return
       }
 
-      let melhorVeiculo: Veiculo | null = null
+      // Busca todos os veiculos para calcular scores
+      const { data: todosVeiculos, error: errorTodos } = await supabase
+        .from('veiculos')
+        .select('*')
+        .order('ano', { ascending: false })
 
-      if (veiculosDaCategoria && veiculosDaCategoria.length > 0) {
-        // Calcula o score de cada veiculo e encontra o melhor
-        let melhorScore = -1
-        
-        for (const veiculo of veiculosDaCategoria) {
-          const score = calcularScoreVeiculo(
-            veiculo as Veiculo,
-            categoriaPreferida,
-            idadeNum,
-            perfilProfissional
-          )
-          
-          if (score > melhorScore) {
-            melhorScore = score
-            melhorVeiculo = veiculo as Veiculo
-          }
-        }
+      if (errorTodos || !todosVeiculos || todosVeiculos.length === 0) {
+        alert('Nenhum veiculo disponivel no momento. Entre em contato para mais opcoes!')
+        return
       }
 
-      // Se nao encontrou na categoria preferida, busca em todas as categorias
-      if (!melhorVeiculo) {
-        const { data: todosVeiculos, error: errorTodos } = await supabase
-          .from('veiculos')
-          .select('*')
-          .order('ano', { ascending: false })
+      // Calcula score de todos os veiculos e ordena
+      const veiculosComScore = todosVeiculos.map(veiculo => ({
+        veiculo: veiculo as Veiculo,
+        score: calcularScoreVeiculo(
+          veiculo as Veiculo,
+          categoriaPreferida,
+          idadeNum,
+          perfilProfissional
+        )
+      }))
 
-        if (!errorTodos && todosVeiculos && todosVeiculos.length > 0) {
-          let melhorScore = -1
-          
-          for (const veiculo of todosVeiculos) {
-            const score = calcularScoreVeiculo(
-              veiculo as Veiculo,
-              categoriaPreferida,
-              idadeNum,
-              perfilProfissional
-            )
-            
-            if (score > melhorScore) {
-              melhorScore = score
-              melhorVeiculo = veiculo as Veiculo
-            }
-          }
-        }
-      }
+      // Ordena por score (maior primeiro) e pega top 3
+      veiculosComScore.sort((a, b) => b.score - a.score)
+      const topVeiculos = veiculosComScore.slice(0, 3).map(v => v.veiculo)
 
-      if (melhorVeiculo) {
-        setVeiculoRecomendado(melhorVeiculo)
+      if (topVeiculos.length > 0) {
+        setVeiculosRecomendados(topVeiculos)
 
+        // Gera argumento para o primeiro veiculo (principal recomendacao)
         setLoadingArgumento(true)
         const argumento = await gerarArgumentoVenda(
-          melhorVeiculo,
+          topVeiculos[0],
           profissao,
           idadeNum,
           rendaNum,
@@ -351,102 +331,166 @@ export function ConsultoriaDashboard() {
         </CardContent>
       </Card>
 
-      {veiculoRecomendado && (
-        <Card className="bg-card border-red-600/50 overflow-hidden">
-          <CardHeader className="bg-gradient-to-r from-red-600/10 to-red-800/10">
-            <CardTitle className="flex items-center gap-2 text-red-500">
-              <Car className="h-5 w-5" />
-              Veiculo Recomendado pela Wyllkens Wcar
-            </CardTitle>
-            <CardDescription>
-              {veiculoRecomendado.categoria === categoriaPreferida
-                ? 'Este veiculo corresponde exatamente ao tipo que voce procura!'
-                : `Recomendamos este ${getCategoriaLabel(veiculoRecomendado.categoria)} como uma excelente opcao para seu perfil`}
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="p-6">
-            {perfilIdentificado && (
-              <div className="mb-6 p-4 rounded-lg bg-red-600/10 border border-red-600/30">
-                <p className="text-sm text-red-400">
-                  <span className="font-semibold">Perfil identificado:</span> Priorizamos {perfilIdentificado.descricao}
-                </p>
-              </div>
-            )}
-            
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-              <div className="aspect-video relative rounded-lg overflow-hidden bg-secondary">
-                {(veiculoRecomendado.imagem || veiculoRecomendado.imagem_url) ? (
-                  <img
-                    src={veiculoRecomendado.imagem || veiculoRecomendado.imagem_url}
-                    alt={veiculoRecomendado.modelo}
-                    className="w-full h-full object-cover"
-                  />
-                ) : (
-                  <div className="w-full h-full flex items-center justify-center">
-                    <Car className="h-20 w-20 text-muted-foreground" />
-                  </div>
-                )}
-              </div>
-              <div className="space-y-4">
-                <div>
-                  <div className="flex items-center gap-2 mb-1">
-                    <span className="px-2 py-1 text-xs font-medium rounded-full bg-red-500/20 text-red-400">
-                      {getCategoriaLabel(veiculoRecomendado.categoria)}
-                    </span>
-                    {veiculoRecomendado.categoria === categoriaPreferida && (
-                      <span className="px-2 py-1 text-xs font-medium rounded-full bg-green-500/20 text-green-400">
-                        Match Perfeito
-                      </span>
-                    )}
-                  </div>
-                  <h3 className="text-2xl font-bold text-foreground">
-                    {veiculoRecomendado.marca} {veiculoRecomendado.modelo}
-                  </h3>
-                  <p className="text-muted-foreground">Ano: {veiculoRecomendado.ano}</p>
-                </div>
-                <div className="bg-gradient-to-r from-red-600/10 to-red-800/10 rounded-lg p-4">
-                  <p className="text-sm text-muted-foreground">Investimento</p>
-                  <p className="text-3xl font-bold text-red-500">
-                    {new Intl.NumberFormat('pt-BR', {
-                      style: 'currency',
-                      currency: 'BRL',
-                    }).format(veiculoRecomendado.preco)}
-                  </p>
-                </div>
-                <div className="space-y-2">
-                  <Button className="w-full bg-red-600 hover:bg-red-700 text-white">
-                    Agendar Visita na Wyllkens Wcar
-                  </Button>
-                  <Button variant="outline" className="w-full border-red-500/50 text-red-500 hover:bg-red-500/10">
-                    <Phone className="mr-2 h-4 w-4" />
-                    (91) 98723-8874
-                  </Button>
-                </div>
-              </div>
+      {veiculosRecomendados.length > 0 && (
+        <div className="space-y-6">
+          {/* Perfil identificado */}
+          {perfilIdentificado && (
+            <div className="p-4 rounded-lg bg-red-600/10 border border-red-600/30">
+              <p className="text-sm text-red-400">
+                <span className="font-semibold">Perfil identificado:</span> Priorizamos {perfilIdentificado.descricao}
+              </p>
             </div>
+          )}
 
-            {(loadingArgumento || argumentoVenda) && (
-              <div className="mt-6 pt-6 border-t border-border">
-                <h4 className="font-semibold text-foreground flex items-center gap-2 mb-3">
-                  <Sparkles className="h-4 w-4 text-red-500" />
-                  Por que este veiculo e ideal para voce
-                </h4>
-                {loadingArgumento ? (
-                  <div className="flex items-center gap-2 text-muted-foreground">
-                    <Loader2 className="h-4 w-4 animate-spin" />
-                    Gerando argumento personalizado com IA...
+          {/* Recomendacao principal */}
+          <Card className="bg-card border-red-600/50 overflow-hidden">
+            <CardHeader className="bg-gradient-to-r from-red-600/10 to-red-800/10">
+              <div className="flex items-center gap-2">
+                <span className="px-3 py-1 text-xs font-bold rounded-full bg-red-600 text-white">
+                  #1 RECOMENDADO
+                </span>
+              </div>
+              <CardTitle className="flex items-center gap-2 text-red-500">
+                <Car className="h-5 w-5" />
+                Melhor Opcao para Voce
+              </CardTitle>
+              <CardDescription>
+                {veiculosRecomendados[0].categoria === categoriaPreferida
+                  ? 'Este veiculo corresponde exatamente ao tipo que voce procura!'
+                  : `Recomendamos este ${getCategoriaLabel(veiculosRecomendados[0].categoria)} como uma excelente opcao para seu perfil`}
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="p-6">
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                <div className="aspect-video relative rounded-lg overflow-hidden bg-secondary">
+                  {(veiculosRecomendados[0].imagem || veiculosRecomendados[0].imagem_url) ? (
+                    <img
+                      src={veiculosRecomendados[0].imagem || veiculosRecomendados[0].imagem_url}
+                      alt={veiculosRecomendados[0].modelo}
+                      className="w-full h-full object-cover"
+                    />
+                  ) : (
+                    <div className="w-full h-full flex items-center justify-center">
+                      <Car className="h-20 w-20 text-muted-foreground" />
+                    </div>
+                  )}
+                </div>
+                <div className="space-y-4">
+                  <div>
+                    <div className="flex items-center gap-2 mb-1">
+                      <span className="px-2 py-1 text-xs font-medium rounded-full bg-red-500/20 text-red-400">
+                        {getCategoriaLabel(veiculosRecomendados[0].categoria)}
+                      </span>
+                      {veiculosRecomendados[0].categoria === categoriaPreferida && (
+                        <span className="px-2 py-1 text-xs font-medium rounded-full bg-green-500/20 text-green-400">
+                          Match Perfeito
+                        </span>
+                      )}
+                    </div>
+                    <h3 className="text-2xl font-bold text-foreground">
+                      {veiculosRecomendados[0].marca} {veiculosRecomendados[0].modelo}
+                    </h3>
+                    <p className="text-muted-foreground">Ano: {veiculosRecomendados[0].ano}</p>
                   </div>
-                ) : (
-                  <div className="prose prose-invert max-w-none">
-                    <p className="text-muted-foreground whitespace-pre-line leading-relaxed">
-                      {argumentoVenda}
+                  <div className="bg-gradient-to-r from-red-600/10 to-red-800/10 rounded-lg p-4">
+                    <p className="text-sm text-muted-foreground">Investimento</p>
+                    <p className="text-3xl font-bold text-red-500">
+                      {new Intl.NumberFormat('pt-BR', {
+                        style: 'currency',
+                        currency: 'BRL',
+                      }).format(veiculosRecomendados[0].preco)}
                     </p>
                   </div>
-                )}
+                  <div className="space-y-2">
+                    <Button className="w-full bg-red-600 hover:bg-red-700 text-white">
+                      Agendar Visita na Wyllkens Wcar
+                    </Button>
+                    <Button variant="outline" className="w-full border-red-500/50 text-red-500 hover:bg-red-500/10">
+                      <Phone className="mr-2 h-4 w-4" />
+                      (91) 98723-8874
+                    </Button>
+                  </div>
+                </div>
               </div>
-            )}
-          </CardContent>
-        </Card>
+
+              {(loadingArgumento || argumentoVenda) && (
+                <div className="mt-6 pt-6 border-t border-border">
+                  <h4 className="font-semibold text-foreground flex items-center gap-2 mb-3">
+                    <Sparkles className="h-4 w-4 text-red-500" />
+                    Por que este veiculo e ideal para voce
+                  </h4>
+                  {loadingArgumento ? (
+                    <div className="flex items-center gap-2 text-muted-foreground">
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                      Gerando argumento personalizado com IA...
+                    </div>
+                  ) : (
+                    <div className="prose prose-invert max-w-none">
+                      <p className="text-muted-foreground whitespace-pre-line leading-relaxed">
+                        {argumentoVenda}
+                      </p>
+                    </div>
+                  )}
+                </div>
+              )}
+            </CardContent>
+          </Card>
+
+          {/* Outras recomendacoes */}
+          {veiculosRecomendados.length > 1 && (
+            <div className="space-y-4">
+              <h3 className="text-xl font-semibold text-foreground">
+                Outras Opcoes para Voce
+              </h3>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                {veiculosRecomendados.slice(1).map((veiculo, index) => (
+                  <Card key={veiculo.id} className="bg-card border-border overflow-hidden hover:border-red-500/50 transition-colors">
+                    <div className="aspect-video relative bg-secondary">
+                      {(veiculo.imagem || veiculo.imagem_url) ? (
+                        <img
+                          src={veiculo.imagem || veiculo.imagem_url}
+                          alt={veiculo.modelo}
+                          className="w-full h-full object-cover"
+                        />
+                      ) : (
+                        <div className="w-full h-full flex items-center justify-center">
+                          <Car className="h-12 w-12 text-muted-foreground" />
+                        </div>
+                      )}
+                      <div className="absolute top-2 left-2">
+                        <span className="px-2 py-1 text-xs font-bold rounded-full bg-background/90 text-foreground">
+                          #{index + 2}
+                        </span>
+                      </div>
+                      <div className="absolute top-2 right-2">
+                        <span className="px-2 py-1 text-xs font-medium rounded-full bg-red-500/20 text-red-400">
+                          {getCategoriaLabel(veiculo.categoria)}
+                        </span>
+                      </div>
+                    </div>
+                    <CardContent className="p-4 space-y-3">
+                      <div>
+                        <h4 className="font-semibold text-foreground">
+                          {veiculo.marca} {veiculo.modelo}
+                        </h4>
+                        <p className="text-sm text-muted-foreground">Ano: {veiculo.ano}</p>
+                      </div>
+                      <p className="text-xl font-bold text-red-500">
+                        {new Intl.NumberFormat('pt-BR', {
+                          style: 'currency',
+                          currency: 'BRL',
+                        }).format(veiculo.preco)}
+                      </p>
+                      <Button variant="outline" className="w-full border-red-500/50 text-red-500 hover:bg-red-500/10" size="sm">
+                        Ver Detalhes
+                      </Button>
+                    </CardContent>
+                  </Card>
+                ))}
+              </div>
+            </div>
+          )}
+        </div>
       )}
     </div>
   )
