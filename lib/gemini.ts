@@ -16,7 +16,8 @@ export async function gerarArgumentoVenda(
   renda: number,
   categoriaPreferida: CategoriaVeiculo
 ): Promise<string> {
-  const model = genAI.getGenerativeModel({ model: 'gemini-1.5-flash' })
+  // Usa gemini-2.0-flash como modelo principal (mais recente e disponivel)
+  const model = genAI.getGenerativeModel({ model: 'gemini-2.0-flash' })
 
   const matchPerfeito = veiculo.categoria === categoriaPreferida
   const veiculoCompleto = `${veiculo.marca} ${veiculo.modelo} ${veiculo.ano}`

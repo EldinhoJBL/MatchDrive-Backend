@@ -65,47 +65,72 @@ function calcularScoreVeiculo(
   veiculo: Veiculo,
   categoriaPreferida: CategoriaVeiculo,
   idade: number,
+  renda: number,
   perfilProfissional: { prioridade: 'economico' | 'conforto' | 'versatil' }
 ): number {
   let score = 0
   
-  // Peso principal: categoria preferida (40 pontos)
+  // FILTRO PRINCIPAL: Limite de 20x o salario (peso eliminatorio)
+  const limitePreco = renda * 20
+  if (veiculo.preco > limitePreco) {
+    // Veiculo acima do limite - penaliza severamente mas nao elimina
+    // Quanto mais acima do limite, maior a penalizacao
+    const percentualAcima = ((veiculo.preco - limitePreco) / limitePreco) * 100
+    score -= Math.min(percentualAcima * 2, 100) // Penaliza ate -100 pontos
+  } else {
+    // Veiculo dentro do orcamento - bonus proporcional
+    const percentualAbaixo = ((limitePreco - veiculo.preco) / limitePreco) * 100
+    score += Math.min(percentualAbaixo * 0.5, 30) // Bonus de ate 30 pontos por estar abaixo do limite
+  }
+  
+  // Peso por categoria preferida (35 pontos)
   if (veiculo.categoria === categoriaPreferida) {
-    score += 40
+    score += 35
   }
   
-  // Peso secundario: perfil profissional (30 pontos)
-  if (perfilProfissional.prioridade === 'economico' && veiculo.categoria === 'hatch') {
-    score += 30
-  } else if (perfilProfissional.prioridade === 'conforto' && veiculo.categoria === 'sedan') {
-    score += 30
-  } else if (perfilProfissional.prioridade === 'versatil' && veiculo.categoria === 'pickup') {
-    score += 30
-  } else {
-    score += 15 // Bonus parcial se nao for o ideal do perfil
+  // Peso por perfil profissional (25 pontos)
+  if (perfilProfissional.prioridade === 'economico') {
+    if (veiculo.categoria === 'hatch') score += 25
+    else if (veiculo.preco < limitePreco * 0.5) score += 15 // Bonus se for economico mesmo sendo outra categoria
+  } else if (perfilProfissional.prioridade === 'conforto') {
+    if (veiculo.categoria === 'sedan') score += 25
+    else if (veiculo.ano >= 2020) score += 10 // Bonus por carro mais novo
+  } else if (perfilProfissional.prioridade === 'versatil') {
+    if (veiculo.categoria === 'pickup') score += 25
+    else score += 10
   }
   
-  // Peso terciario: idade (20 pontos)
-  if (idade < 30) {
-    // Jovens: preferem carros mais novos e economicos
-    if (veiculo.ano >= 2020) score += 15
-    if (veiculo.categoria === 'hatch') score += 5
-  } else if (idade >= 30 && idade < 50) {
-    // Adultos: equilibrio entre conforto e custo-beneficio
-    if (veiculo.ano >= 2018) score += 10
-    if (veiculo.categoria === 'sedan') score += 10
-  } else {
-    // Mais velhos: priorizam conforto e seguranca
+  // Peso por idade do cliente (20 pontos)
+  if (idade < 25) {
+    // Muito jovens: economia e praticidade sao essenciais
+    if (veiculo.categoria === 'hatch') score += 15
+    if (veiculo.preco < limitePreco * 0.4) score += 10
+    if (veiculo.ano >= 2020) score += 5
+  } else if (idade >= 25 && idade < 35) {
+    // Jovens adultos: equilibrio entre estilo e economia
+    if (veiculo.ano >= 2019) score += 10
+    if (veiculo.categoria === 'hatch' || veiculo.categoria === 'sedan') score += 10
+  } else if (idade >= 35 && idade < 50) {
+    // Adultos estabelecidos: conforto e status
     if (veiculo.categoria === 'sedan') score += 15
-    score += 5 // Bonus por preferir veiculos confiaveis
+    if (veiculo.ano >= 2018) score += 5
+  } else if (idade >= 50 && idade < 65) {
+    // Maduros: conforto e seguranca
+    if (veiculo.categoria === 'sedan') score += 20
+    score += 5
+  } else {
+    // Idosos: conforto absoluto e confiabilidade
+    if (veiculo.categoria === 'sedan') score += 20
+    if (veiculo.ano >= 2018) score += 5
   }
   
   // Bonus por ano do veiculo (10 pontos)
   const anoAtual = new Date().getFullYear()
   const idadeVeiculo = anoAtual - veiculo.ano
-  if (idadeVeiculo <= 3) score += 10
-  else if (idadeVeiculo <= 5) score += 7
-  else if (idadeVeiculo <= 8) score += 4
+  if (idadeVeiculo <= 2) score += 10
+  else if (idadeVeiculo <= 4) score += 7
+  else if (idadeVeiculo <= 6) score += 4
+  else if (idadeVeiculo <= 10) score += 2
   
   return score
 }
@@ -163,12 +188,14 @@ export function ConsultoriaDashboard() {
       }
 
       // Calcula score de todos os veiculos e ordena
+      // Considera limite de 20x salario, idade e perfil profissional
       const veiculosComScore = todosVeiculos.map(veiculo => ({
         veiculo: veiculo as Veiculo,
         score: calcularScoreVeiculo(
           veiculo as Veiculo,
           categoriaPreferida,
           idadeNum,
+          rendaNum,
           perfilProfissional
         )
       }))
@@ -333,11 +360,14 @@ export function ConsultoriaDashboard() {
 
       {veiculosRecomendados.length > 0 && (
         <div className="space-y-6">
-          {/* Perfil identificado */}
+          {/* Perfil identificado e limite de orcamento */}
           {perfilIdentificado && (
-            <div className="p-4 rounded-lg bg-red-600/10 border border-red-600/30">
+            <div className="p-4 rounded-lg bg-red-600/10 border border-red-600/30 space-y-2">
               <p className="text-sm text-red-400">
                 <span className="font-semibold">Perfil identificado:</span> Priorizamos {perfilIdentificado.descricao}
+              </p>
+              <p className="text-sm text-muted-foreground">
+                <span className="font-semibold">Limite recomendado:</span> Ate {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(parseFloat(renda.replace(/\D/g, '')) * 20)} (20x seu salario)
               </p>
             </div>
           )}
@@ -377,13 +407,18 @@ export function ConsultoriaDashboard() {
                 </div>
                 <div className="space-y-4">
                   <div>
-                    <div className="flex items-center gap-2 mb-1">
+                    <div className="flex flex-wrap items-center gap-2 mb-1">
                       <span className="px-2 py-1 text-xs font-medium rounded-full bg-red-500/20 text-red-400">
                         {getCategoriaLabel(veiculosRecomendados[0].categoria)}
                       </span>
                       {veiculosRecomendados[0].categoria === categoriaPreferida && (
                         <span className="px-2 py-1 text-xs font-medium rounded-full bg-green-500/20 text-green-400">
                           Match Perfeito
+                        </span>
+                      )}
+                      {veiculosRecomendados[0].preco <= parseFloat(renda.replace(/\D/g, '')) * 20 && (
+                        <span className="px-2 py-1 text-xs font-medium rounded-full bg-blue-500/20 text-blue-400">
+                          Dentro do Orcamento
                         </span>
                       )}
                     </div>
