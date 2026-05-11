@@ -1,7 +1,7 @@
 import { GoogleGenerativeAI } from '@google/generative-ai'
 import type { CategoriaVeiculo } from './supabase'
 
-const genAI = new GoogleGenerativeAI('AIzaSyCM2BulmitOoo3SKGdEItp2jK6NkvnkqlM')
+const genAI = new GoogleGenerativeAI(process.env.GOOGLE_GEMINI_API_KEY || '')
 
 const CATEGORIA_LABELS: Record<CategoriaVeiculo, string> = {
   hatch: 'Hatch',
